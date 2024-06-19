@@ -11,6 +11,20 @@ Eigen::Matrix3d QuaternionToRotationMatrix(const geometry_msgs::Quaternion &q) {
   return rotation_matrix;
 }
 
+// 创建 4x4 变换矩阵
+Eigen::Matrix4d PoseToTransformationMatrix(const geometry_msgs::Pose &pose) {
+  Eigen::Quaterniond quaternion(pose.orientation.w, pose.orientation.x, pose.orientation.y, pose.orientation.z);
+  Eigen::Matrix3d rotation_matrix = quaternion.toRotationMatrix();
+
+  Eigen::Matrix4d transformation_matrix = Eigen::Matrix4d::Identity();
+  transformation_matrix.block<3, 3>(0, 0) = rotation_matrix;
+  transformation_matrix(0, 3) = pose.position.x;
+  transformation_matrix(1, 3) = pose.position.y;
+  transformation_matrix(2, 3) = pose.position.z;
+
+  return transformation_matrix;
+}
+
 void ReadMTvoc2D(const std::string &input_file_path, const std::string &output_file_path) {
   std::ifstream in_file(input_file_path, std::ios::in | std::ios::binary);
   if (!in_file) {
@@ -51,15 +65,10 @@ void ReadMTvoc2D(const std::string &input_file_path, const std::string &output_f
 
   for (const auto &poses : MTvoc2D_read) {
     for (const auto &pose : poses) {
-      // 转换四元数到旋转矩阵
-      Eigen::Matrix3d rotation_matrix = QuaternionToRotationMatrix(pose.orientation);
+      // 创建 4x4 变换矩阵
+      Eigen::Matrix4d transformation_matrix = PoseToTransformationMatrix(pose);
 
-      out_file << "Position: "
-               << pose.position.x << " "
-               << pose.position.y << " "
-               << pose.position.z << " "
-               << "Orientation (Rotation Matrix):\n"
-               << rotation_matrix << "\n\n";
+      out_file << transformation_matrix << "\n\n";
     }
     out_file << std::endl;// 在每组姿势之间加一个空行
   }

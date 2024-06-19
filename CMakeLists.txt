@@ -12,3 +12,6 @@ target_link_libraries(visualize_point_clouds ${PCL_LIBRARIES})
 
 add_executable(l2c_icp l2c_icp.cpp)
 target_link_libraries(l2c_icp ${PCL_LIBRARIES})
+
+add_executable(computer_error computer_error.cpp)
+target_link_libraries(computer_error ${PCL_LIBRARIES})
