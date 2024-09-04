@@ -25,7 +25,7 @@ catkin_make
 
 ### 用法
 #### 点云配准
-- 无初值
+1. 无初值
 ```
 l2c_icp source.csv target.csv leaf_size height_limit
 ```
@@ -37,7 +37,7 @@ l2c_icp source.csv target.csv leaf_size height_limit
 * k，l（绕z轴旋转）
 * a（增加每次平移的距离）d（减少每次平移的距离）
 
-- 有初值
+2. 有初值
 ```
 l2c_icp source.csv target.csv leaf_size height_limit initial_transformation_matrix_path
 ```
