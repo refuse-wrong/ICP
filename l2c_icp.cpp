@@ -7,8 +7,12 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/registration/icp.h>
+#include <pcl/registration/ndt.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <thread>
+
+float step = 0.01;
+float angle_step = 0.01;// 旋转步长（弧度）
 
 // Function to load point cloud from a CSV file
 bool loadPointCloudFromCSV(const std::string &filename, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
@@ -106,10 +110,45 @@ Eigen::Matrix4f performICP(pcl::PointCloud<pcl::PointXYZ>::Ptr source,
   return transformation;
 }
 
+// Function to perform NDT between two point clouds
+Eigen::Matrix4f performNDT(pcl::PointCloud<pcl::PointXYZ>::Ptr source,
+                           pcl::PointCloud<pcl::PointXYZ>::Ptr target,
+                           pcl::PointCloud<pcl::PointXYZ>::Ptr output,
+                           float resolution,
+                           int min_points_per_voxel = 3,
+                           Eigen::Matrix4f initial_guess = Eigen::Matrix4f::Identity()) {
+  // 创建 NDT 对象
+  std::cout << "ndt" << std::endl;
+  pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt;
+  ndt.setResolution(resolution);                    // 设置分辨率
+  ndt.setMinPointPerVoxel(min_points_per_voxel);    // 设置每个体素的最小点数
+  ndt.setMaximumIterations(1000);                   // 设置最大迭代次数
+  ndt.setTransformationEpsilon(1e-8);               // 设置变换阈值
+  ndt.setStepSize(1.0);                             // 设置步长
+
+  // 设置输入点云
+  ndt.setInputSource(source);
+  ndt.setInputTarget(target);
+
+  // 执行配准
+  ndt.align(*output, initial_guess);
+
+  Eigen::Matrix4f transformation = Eigen::Matrix4f::Identity();
+  if (ndt.hasConverged()) {
+    std::cout << "NDT has converged, score is " << ndt.getFitnessScore() << std::endl;
+    std::cout << "Transformation matrix:" << std::endl
+              << ndt.getFinalTransformation() << std::endl;
+    transformation = ndt.getFinalTransformation();
+  } else {
+    std::cout << "NDT has not converged." << std::endl;
+  }
+
+  return transformation;
+}
+
 void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void *user_data) {
   Eigen::Matrix4f *transformation = reinterpret_cast<Eigen::Matrix4f *>(user_data);
-  float step = 0.01;
-  float angle_step = 0.01;                                // 旋转步长（弧度）
+
   Eigen::Matrix4f rotation = Eigen::Matrix4f::Identity();// 初始化为单位矩阵
 
   if (event.getKeySym() == "Left" && event.keyDown()) {
@@ -140,6 +179,13 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
     rotation(1, 0) = sin(angle);
     rotation(1, 1) = cos(angle);
     *transformation = rotation * (*transformation);
+  } else if (event.getKeySym() == "a" && event.keyDown()) {
+    step += 0.1;
+  } else if (event.getKeySym() == "d" && event.keyDown()) {
+    step -= 0.1;
+    if (step < 0.01) {
+      step = 0.01;
+    }
   }
 }
 
@@ -156,7 +202,7 @@ int main(int argc, char **argv) {
   Eigen::Matrix4f initial_guess = Eigen::Matrix4f::Identity();
   if (argc == 6){
     std::string matrix_file = argv[5];
-    Eigen::Matrix4f initial_guess = loadTransformationMatrix(matrix_file);
+    initial_guess = loadTransformationMatrix(matrix_file);
   }
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_target(new pcl::PointCloud<pcl::PointXYZ>);
@@ -173,10 +219,13 @@ int main(int argc, char **argv) {
     return -1;
   }
 
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source_new(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::transformPointCloud(*cloud_source, *cloud_source_new, initial_guess);
+
   // Apply height restriction to the source cloud
   float height_limit = std::stof(argv[4]);
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source_filtered(new pcl::PointCloud<pcl::PointXYZ>);
-  for (const auto &point : cloud_source->points) {
+  for (const auto &point : cloud_source_new->points) {
     if (point.z <= height_limit) {
       cloud_source_filtered->points.push_back(point);
     }
@@ -202,7 +251,7 @@ int main(int argc, char **argv) {
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_target_voxel_filtered(new pcl::PointCloud<pcl::PointXYZ>);
   voxel_grid1.filter(*cloud_target_voxel_filtered);
 
-  std::cout << "Source cloud size: " << cloud_source->size() << " points." << std::endl;
+  std::cout << "Source cloud size: " << cloud_source_new->size() << " points." << std::endl;
   std::cout << "Filtered source cloud size: " << cloud_source_filtered->size() << " points." << std::endl;
   std::cout << "Voxel filtered source cloud size: " << cloud_source_voxel_filtered->size() << " points." << std::endl;
   std::cout << "Target cloud size: " << cloud_target->size() << " points." << std::endl;
@@ -210,21 +259,27 @@ int main(int argc, char **argv) {
 
   // Perform ICP between sparse and dense point clouds
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_final(new pcl::PointCloud<pcl::PointXYZ>);
-  Eigen::Matrix4f transformation = performICP(cloud_source_voxel_filtered, cloud_target_voxel_filtered, cloud_final, leaf_size * 5, initial_guess);
+  // Eigen::Matrix4f transformation = performICP(cloud_source_voxel_filtered, cloud_target_voxel_filtered, cloud_final, leaf_size * 5, initial_guess);
 
-  // Transform the original cloud_source based on the final transformation
+  // 设置每个体素的最小点数
+  int min_points_per_voxel = 3;
+  // 设置 NDT 分辨率
+  float resolution = 1.0;
+  Eigen::Matrix4f transformation = performNDT(cloud_source_voxel_filtered, cloud_target_voxel_filtered, cloud_final, resolution, min_points_per_voxel);
+
+  // Transform the original cloud_source_new based on the final transformation
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_source_transformed(new pcl::PointCloud<pcl::PointXYZ>);
-  pcl::transformPointCloud(*cloud_source, *cloud_source_transformed, transformation);
+  pcl::transformPointCloud(*cloud_source_new, *cloud_source_transformed, transformation);
 
   // Save the initial transformation matrix to a file
-  saveMatrixToFile(transformation, "initial_transformation_matrix.txt");
+  saveMatrixToFile(initial_guess*transformation, "initial_transformation_matrix.txt");
 
   // Initialize PCLVisualizer
   pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
   viewer->setBackgroundColor(0, 0, 0);
 
-//   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> source_color(cloud_source, 0, 0, 255);
-//   viewer->addPointCloud<pcl::PointXYZ>(cloud_source, source_color, "source cloud");
+  // pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> source_color(cloud_source_new, 0, 0, 255);
+  // viewer->addPointCloud<pcl::PointXYZ>(cloud_source_new, source_color, "source cloud");
 
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> target_color(cloud_target, 0, 255, 0);
   viewer->addPointCloud<pcl::PointXYZ>(cloud_target, target_color, "target cloud");
@@ -232,7 +287,7 @@ int main(int argc, char **argv) {
   pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> transformed_source_color(cloud_source_transformed, 255, 0, 0);
   viewer->addPointCloud<pcl::PointXYZ>(cloud_source_transformed, transformed_source_color, "transformed source cloud");
 
-//   viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "source cloud");
+  // viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "source cloud");
   viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "target cloud");
   viewer->setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "transformed source cloud");
   viewer->addCoordinateSystem(1.0);
@@ -243,14 +298,14 @@ int main(int argc, char **argv) {
 
   while (!viewer->wasStopped()) {
     // Update the transformed source cloud based on the current transformation matrix
-    updateTransformedCloud(cloud_source, cloud_source_transformed, transformation);
+    updateTransformedCloud(cloud_source_new, cloud_source_transformed, transformation);
     viewer->updatePointCloud(cloud_source_transformed, transformed_source_color, "transformed source cloud");
     viewer->spinOnce(100);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
-
-  // Save the manually adjusted transformation matrix to a file
-  saveMatrixToFile(transformation, "manual_transformation_matrix.txt");
-
-  return 0;
-}
+  if (argc == 5) {
+    // Save the manually adjusted transformation matrix to a file
+    saveMatrixToFile(initial_guess*transformation, "manual_transformation_matrix.txt");
+  }
+    return 0;
+  }
