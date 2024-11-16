@@ -30,6 +30,8 @@ catkin_make
 l2c_icp source.csv target.csv leaf_size height_limit
 ```
 如果没有匹配成功可以通过按键移动点云，点击退出键后，则会保存初值。从而获取初值
+保存的初值文件为：manual_transformation_matrix.txt（通过手动对齐获取的初值）
+ndt获取的结果文件为：initial_transformation_matrix.txt
 按键包括：
 * Left，Right（x轴平移）
 * Up，Down（y轴平移）
@@ -44,12 +46,9 @@ l2c_icp source.csv target.csv leaf_size height_limit
 l2c_icp source.csv target.csv leaf_size height_limit initial_transformation_matrix_path
 ```
 
-将bin文件转换为txt文件
-```
-rosrun occupancy_grid_to_pcd mtvoc_reader_node <bin_file_path> <txt_file_path>
-```
-
 #### 计算误差
 ```
-computer_error <transformation_matrix_file1> <transformation_matrix_file2>
+rosrun occupancy_grid_to_pcd mtvoc_reader_node <bin_file_path> <txt_file_path> <gt_file_path>
 ```
+
+

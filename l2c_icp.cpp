@@ -304,7 +304,7 @@ int main(int argc, char **argv) {
   pcl::transformPointCloud(*cloud_source_new, *cloud_source_transformed, transformation);
 
   // Save the initial transformation matrix to a file
-  saveMatrixToFile(initial_guess*transformation, "initial_transformation_matrix.txt");
+  saveMatrixToFile(initial_guess*transformation, "ICP_transformation_matrix.txt");
 
   // Initialize PCLVisualizer
   pcl::visualization::PCLVisualizer::Ptr viewer(new pcl::visualization::PCLVisualizer("3D Viewer"));
