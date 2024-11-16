@@ -186,6 +186,38 @@ void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void 
     if (step < 0.01) {
       step = 0.01;
     }
+  } else if (event.getKeySym() == "7" && event.keyDown()) {
+    // 顺时针旋转绕X轴
+    float angle = angle_step;// 旋转角度
+    rotation(1, 1) = cos(angle);
+    rotation(1, 2) = -sin(angle);
+    rotation(2, 1) = sin(angle);
+    rotation(2, 2) = cos(angle);
+    *transformation = rotation * (*transformation);
+  } else if (event.getKeySym() == "8" && event.keyDown()) {
+    // 逆时针旋转绕X轴
+    float angle = -angle_step;// 旋转角度
+    rotation(1, 1) = cos(angle);
+    rotation(1, 2) = -sin(angle);
+    rotation(2, 1) = sin(angle);
+    rotation(2, 2) = cos(angle);
+    *transformation = rotation * (*transformation);
+  } else if (event.getKeySym() == "9" && event.keyDown()) {
+    // 顺时针旋转绕Y轴
+    float angle = angle_step;// 旻转角度
+    rotation(0, 0) = cos(angle);
+    rotation(0, 2) = sin(angle);
+    rotation(2, 0) = -sin(angle);
+    rotation(2, 2) = cos(angle);
+    *transformation = rotation * (*transformation);
+  } else if (event.getKeySym() == "0" && event.keyDown()) {
+    // 逆时针旋转绕Y轴
+    float angle = -angle_step;// 旻转角度
+    rotation(0, 0) = cos(angle);
+    rotation(0, 2) = sin(angle);
+    rotation(2, 0) = -sin(angle);
+    rotation(2, 2) = cos(angle);
+    *transformation = rotation * (*transformation);
   }
 }
 

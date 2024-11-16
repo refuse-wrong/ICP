@@ -29,18 +29,26 @@ catkin_make
 ```
 l2c_icp source.csv target.csv leaf_size height_limit
 ```
-如果没有匹配成功可以通过按键移动点云，从而获取初值
+如果没有匹配成功可以通过按键移动点云，点击退出键后，则会保存初值。从而获取初值
 按键包括：
 * Left，Right（x轴平移）
 * Up，Down（y轴平移）
 * n,m（z轴平移）
 * k，l（绕z轴旋转）
+* 7, 8（绕x轴旋转）
+* 9, 0（绕y轴旋转）
 * a（增加每次平移的距离）d（减少每次平移的距离）
 
 2. 有初值
 ```
 l2c_icp source.csv target.csv leaf_size height_limit initial_transformation_matrix_path
 ```
+
+将bin文件转换为txt文件
+```
+rosrun occupancy_grid_to_pcd mtvoc_reader_node <bin_file_path> <txt_file_path>
+```
+
 #### 计算误差
 ```
 computer_error <transformation_matrix_file1> <transformation_matrix_file2>
